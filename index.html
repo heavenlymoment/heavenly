@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>음악 분석기</title>
+<style>
+/* 외부 폰트 없음 — 시스템 폰트만 사용 */
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+body {
+  background:#0b0b14;
+  color:#e8e8f2;
+  font-family:-apple-system, BlinkMacSystemFont, 'Malgun Gothic', '맑은 고딕', sans-serif;
+  min-height:100vh;
+  padding:0 0 80px;
+}
+
+.top-bar {
+  background:linear-gradient(180deg,#13131f,transparent);
+  padding:36px 24px 20px;
+  text-align:center;
+}
+
+.app-label {
+  font-size:10px;
+  letter-spacing:4px;
+  color:#3cffd0;
+  text-transform:uppercase;
+  margin-bottom:10px;
+  opacity:0.8;
+}
+
+.app-title {
+  font-size:36px;
+  font-weight:900;
+  letter-spacing:2px;
+  color:#fff;
+  margin-bottom:6px;
+}
+
+.app-title span { color:#f0c040; }
+
+.app-sub {
+  font-size:12px;
+  color:#5a5a78;
+  line-height:1.7;
+}
+
+.wrap { max-width:700px; margin:0 auto; padding:0 16px; }
+
+/* 업로드 박스 */
+.upload-box {
+  border:2px dashed #2a2a3e;
+  border-radius:18px;
+  padding:48px 24px;
+  text-align:center;
+  cursor:pointer;
+  background:#11111e;
+  margin:20px 0 14px;
+  transition:border-color 0.2s, background 0.2s;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+.upload-box.drag { border-color:#f0c040; background:#15150e; }
+.upload-box:active { border-color:#f0c040; }
+
+.upload-icon { font-size:52px; display:block; margin-bottom:16px; }
+
+.upload-box h2 { font-size:17px; font-weight:700; margin-bottom:8px; color:#e8e8f2; }
+.upload-box p { font-size:13px; color:#5a5a78; line-height:1.7; }
+.upload-box p b { color:#f0c040; font-weight:600; }
+.upload-box p small { color:#3cffd0; font-size:11px; }
+
+#fileInput { display:none; }
+
+/* OR 구분 */
+.or-line {
+  display:flex; align-items:center; gap:12px;
+  color:#333350; font-size:11px; letter-spacing:2px;
+  margin:0 0 14px;
+}
+.or-line::before,.or-line::after {
+  content:''; flex:1; height:1px; background:#1e1e30;
+}
+
+/* YT 입력 */
+.yt-wrap { display:flex; gap:8px; margin-bottom:10px; }
+
+.yt-input {
+  flex:1;
+  background:#11111e;
+  border:1.5px solid #2a2a3e;
+  border-radius:12px;
+  padding:13px 16px;
+  color:#e8e8f2;
+  font-size:13px;
+  font-family:inherit;
+  outline:none;
+  min-width:0;
+}
+.yt-input:focus { border-color:#ff5f7e; }
+.yt-input::placeholder { color:#3a3a58; }
+
+.btn-analyze {
+  background:#f0c040;
+  color:#0b0b14;
+  border:none;
+  border-radius:12px;
+  padding:13px 20px;
+  font-size:14px;
+  font-weight:800;
+  font-family:inherit;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background 0.15s, transform 0.1s;
+  -webkit-appearance:none;
+}
+.btn-analyze:active { background:#ffd060; transform:scale(0.97); }
+.btn-analyze:disabled { opacity:0.35; }
+
+.yt-note {
+  font-size:11px;
+  color:#ff5f7e;
+  background:rgba(255,95,126,0.07);
+  border:1px solid rgba(255,95,126,0.15);
+  border-radius:10px;
+  padding:10px 14px;
+  line-height:1.6;
+  margin-bottom:28px;
+}
+
+/* 에러 */
+.error-box {
+  display:none;
+  background:rgba(255,95,126,0.08);
+  border:1px solid rgba(255,95,126,0.25);
+  border-radius:12px;
+  padding:16px 18px;
+  color:#ff5f7e;
+  font-size:13px;
+  line-height:1.7;
+  margin-bottom:16px;
+  white-space:pre-wrap;
+}
+
+/* 로딩 */
+.loading {
+  display:none;
+  text-align:center;
+  padding:52px 0;
+}
+
+.bars {
+  display:flex;
+  justify-content:center;
+  align-items:flex-end;
+  gap:5px;
+  height:50px;
+  margin-bottom:20px;
+}
+
+.bar {
+  width:6px;
+  border-radius:3px;
+  background:#f0c040;
+  animation:bar 1.1s ease-in-out infinite;
+}
+.bar:nth-child(1){animation-delay:0s}
+.bar:nth-child(2){animation-delay:.1s}
+.bar:nth-child(3){animation-delay:.2s}
+.bar:nth-child(4){animation-delay:.3s}
+.bar:nth-child(5){animation-delay:.4s}
+.bar:nth-child(6){animation-delay:.3s}
+.bar:nth-child(7){animation-delay:.2s}
+
+@keyframes bar {
+  0%,100%{height:8px;opacity:0.3}
+  50%{height:46px;opacity:1}
+}
+
+.loading-text { font-size:15px; color:#e8e8f2; margin-bottom:8px; }
+.loading-step { font-size:12px; color:#3cffd0; }
+
+/* 결과 */
+.result-wrap { display:none; }
+
+.result-badge {
+  display:none;
+  background:rgba(240,192,64,0.09);
+  border:1px solid rgba(240,192,64,0.2);
+  border-radius:10px;
+  padding:10px 14px;
+  font-size:11px;
+  color:#f0c040;
+  margin-bottom:14px;
+  line-height:1.6;
+}
+
+.result-fn {
+  font-size:11px;
+  color:#3a3a58;
+  margin-bottom:18px;
+  word-break:break-all;
+}
+
+/* 지표 그리드 */
+.metrics {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.metric {
+  background:#13131f;
+  border:1px solid #1e1e30;
+  border-radius:14px;
+  padding:20px 10px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+
+.metric::after {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+}
+
+.metric.bpm::after { background:linear-gradient(90deg,#f0c040,transparent); }
+.metric.key::after  { background:linear-gradient(90deg,#3cffd0,transparent); }
+.metric.conf::after { background:linear-gradient(90deg,#ff5f7e,transparent); }
+
+.metric-lbl {
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:#3a3a58;
+  margin-bottom:10px;
+}
+
+.metric-val {
+  font-size:38px;
+  font-weight:900;
+  line-height:1;
+  margin-bottom:4px;
+}
+
+.metric.bpm .metric-val { color:#f0c040; }
+.metric.key .metric-val { color:#3cffd0; font-size:30px; }
+.metric.conf .metric-val { color:#ff5f7e; font-size:30px; }
+
+.metric-sub { font-size:10px; color:#3a3a58; }
+
+/* 장르 */
+.genre-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.genre-card {
+  background:#13131f;
+  border:1px solid #1e1e30;
+  border-radius:14px;
+  padding:18px 16px;
+  position:relative;
+  overflow:hidden;
+}
+
+.genre-card::after {
+  content:''; position:absolute;
+  top:0; left:0; right:0; height:2px;
+}
+
+.genre-card.main::after { background:linear-gradient(90deg,#c4b5fd,#ff5f7e); }
+.genre-card.sub::after  { background:linear-gradient(90deg,#93c5fd,#3cffd0); }
+
+.genre-lbl {
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:#3a3a58;
+  margin-bottom:10px;
+}
+
+.genre-name {
+  font-size:16px;
+  font-weight:700;
+  line-height:1.3;
+  margin-bottom:10px;
+}
+
+.genre-card.main .genre-name { color:#c4b5fd; }
+.genre-card.sub  .genre-name { color:#93c5fd; }
+
+.tags { display:flex; flex-wrap:wrap; gap:5px; }
+
+.tag {
+  font-size:10px;
+  padding:3px 9px;
+  border-radius:20px;
+}
+
+.genre-card.main .tag { background:rgba(196,181,253,.1); color:#c4b5fd; border:1px solid rgba(196,181,253,.2); }
+.genre-card.sub  .tag { background:rgba(147,197,253,.1); color:#93c5fd; border:1px solid rgba(147,197,253,.2); }
+
+/* 에너지 */
+.extra-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+.extra-card {
+  background:#13131f;
+  border:1px solid #1e1e30;
+  border-radius:14px;
+  padding:18px 16px;
+}
+
+.extra-lbl { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:#3a3a58; margin-bottom:10px; }
+.extra-val { font-size:15px; font-weight:600; margin-bottom:10px; }
+
+.bar-track { height:6px; background:#1e1e30; border-radius:3px; overflow:hidden; }
+.bar-fill  { height:100%; border-radius:3px; width:0%; transition:width 1s ease; }
+.bar-fill.en { background:linear-gradient(90deg,#f0c040,#ff5f7e); }
+.bar-fill.da { background:linear-gradient(90deg,#3cffd0,#93c5fd); }
+
+/* 리셋 */
+.btn-reset {
+  display:block;
+  width:100%;
+  padding:15px;
+  background:transparent;
+  border:1.5px solid #1e1e30;
+  border-radius:12px;
+  color:#3a3a58;
+  font-size:14px;
+  font-family:inherit;
+  cursor:pointer;
+  transition:all 0.2s;
+  -webkit-appearance:none;
+}
+.btn-reset:active { border-color:#f0c040; color:#f0c040; }
+
+@media(max-width:400px){
+  .metric-val{font-size:30px}
+  .metric.key .metric-val,.metric.conf .metric-val{font-size:24px}
+  .genre-name{font-size:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="app-label">MUSIC ANALYZER</div>
+  <div class="app-title">SOUND<span>LENS</span></div>
+  <div class="app-sub">음악 파일 또는 YouTube 링크로<br>장르 · BPM · Key를 분석해드려요</div>
+</div>
+
+<div class="wrap">
+
+  <!-- 업로드 -->
+  <div class="upload-box" id="uploadBox">
+    <span class="upload-icon">🎧</span>
+    <h2>음원 파일을 탭하거나 드래그하세요</h2>
+    <p><b>MP3 · WAV · FLAC · OGG · AAC · M4A</b><br>
+    <small>🔒 파일은 브라우저 안에서만 처리돼요</small></p>
+    <input type="file" id="fileInput" accept="audio/*">
+  </div>
+
+  <div class="or-line">OR</div>
+
+  <div class="yt-wrap">
+    <input class="yt-input" id="ytInput" type="url" placeholder="YouTube URL (https://youtu.be/...)">
+    <button class="btn-analyze" id="ytBtn">분석</button>
+  </div>
+  <div class="yt-note">⚠️ YouTube는 음원을 직접 읽을 수 없어 AI가 BPM·Key를 추정합니다.</div>
+
+  <!-- 에러 -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- 로딩 -->
+  <div class="loading" id="loading">
+    <div class="bars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+    <div class="loading-text">분석 중이에요...</div>
+    <div class="loading-step" id="loadStep">파일 읽는 중</div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result-wrap" id="resultWrap">
+    <div class="result-badge" id="aiBadge">✦ BPM · Key는 AI 추정값이에요. 정확한 수치는 음원 파일 업로드를 권장해요.</div>
+    <div class="result-fn" id="resultFn"></div>
+
+    <div class="metrics">
+      <div class="metric bpm">
+        <div class="metric-lbl">BPM</div>
+        <div class="metric-val" id="rBpm">—</div>
+        <div class="metric-sub">박자 수</div>
+      </div>
+      <div class="metric key">
+        <div class="metric-lbl">KEY</div>
+        <div class="metric-val" id="rKey">—</div>
+        <div class="metric-sub" id="rMode">조성</div>
+      </div>
+      <div class="metric conf">
+        <div class="metric-lbl">신뢰도</div>
+        <div class="metric-val" id="rConf">—</div>
+        <div class="metric-sub">Key 정확도</div>
+      </div>
+    </div>
+
+    <div class="genre-grid">
+      <div class="genre-card main">
+        <div class="genre-lbl">주 장르</div>
+        <div class="genre-name" id="rMain">—</div>
+        <div class="tags" id="rMainTags"></div>
+      </div>
+      <div class="genre-card sub">
+        <div class="genre-lbl">세부 장르</div>
+        <div class="genre-name" id="rSub">—</div>
+        <div class="tags" id="rSubTags"></div>
+      </div>
+    </div>
+
+    <div class="extra-grid">
+      <div class="extra-card">
+        <div class="extra-lbl">에너지</div>
+        <div class="extra-val" id="rEnergy">—</div>
+        <div class="bar-track"><div class="bar-fill en" id="enBar"></div></div>
+      </div>
+      <div class="extra-card">
+        <div class="extra-lbl">댄서빌리티</div>
+        <div class="extra-val" id="rDance">—</div>
+        <div class="bar-track"><div class="bar-fill da" id="daBar"></div></div>
+      </div>
+    </div>
+
+    <button class="btn-reset" id="resetBtn">↺ 다른 음악 분석하기</button>
+  </div>
+
+</div>
+
+<script>
+// ── 요소 ──
+var uploadBox = document.getElementById('uploadBox');
+var fileInput  = document.getElementById('fileInput');
+var loading    = document.getElementById('loading');
+var loadStep   = document.getElementById('loadStep');
+var resultWrap = document.getElementById('resultWrap');
+var errorBox   = document.getElementById('errorBox');
+var aiBadge    = document.getElementById('aiBadge');
+var ytInput    = document.getElementById('ytInput');
+var ytBtn      = document.getElementById('ytBtn');
+var resetBtn   = document.getElementById('resetBtn');
+
+// ── 이벤트 ──
+uploadBox.addEventListener('click', function(){ fileInput.click(); });
+fileInput.addEventListener('change', function(e){
+  if (e.target.files && e.target.files[0]) analyzeFile(e.target.files[0]);
+});
+
+uploadBox.addEventListener('dragover', function(e){ e.preventDefault(); uploadBox.classList.add('drag'); });
+uploadBox.addEventListener('dragleave', function(){ uploadBox.classList.remove('drag'); });
+uploadBox.addEventListener('drop', function(e){
+  e.preventDefault(); uploadBox.classList.remove('drag');
+  if (e.dataTransfer.files[0]) analyzeFile(e.dataTransfer.files[0]);
+});
+
+ytBtn.addEventListener('click', analyzeYT);
+ytInput.addEventListener('keydown', function(e){ if(e.key==='Enter') analyzeYT(); });
+resetBtn.addEventListener('click', resetAll);
+
+// ── 상태 초기화 ──
+function resetAll(){
+  resultWrap.style.display = 'none';
+  loading.style.display    = 'none';
+  errorBox.style.display   = 'none';
+  aiBadge.style.display    = 'none';
+  uploadBox.style.display  = 'block';
+  ytInput.value = '';
+  fileInput.value = '';
+  document.getElementById('enBar').style.width = '0%';
+  document.getElementById('daBar').style.width = '0%';
+}
+
+function showError(msg){
+  loading.style.display   = 'none';
+  errorBox.textContent    = msg;
+  errorBox.style.display  = 'block';
+  uploadBox.style.display = 'block';
+  ytBtn.disabled = false;
+}
+
+function setStep(t){ loadStep.textContent = t; }
+
+function startLoading(){
+  uploadBox.style.display  = 'none';
+  resultWrap.style.display = 'none';
+  errorBox.style.display   = 'none';
+  aiBadge.style.display    = 'none';
+  loading.style.display    = 'block';
+}
+
+// ── 파일 분석 ──
+function analyzeFile(file){
+  startLoading();
+  setStep('파일 읽는 중...');
+
+  var reader = new FileReader();
+  reader.onerror = function(){ showError('파일을 읽을 수 없어요.'); };
+  reader.onload = function(e){
+    setStep('오디오 디코딩 중...');
+    var ctx;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(err) {
+      showError('이 브라우저는 Web Audio API를 지원하지 않아요.\n크롬이나 삼성인터넷 최신 버전을 사용해주세요.');
+      return;
+    }
+
+    ctx.decodeAudioData(
+      e.target.result,
+      function(buf){
+        setStep('BPM 감지 중...');
+        var bpm = detectBPM(buf);
+
+        setStep('키 분석 중...');
+        var keyResult = detectKey(buf);
+
+        setStep('장르 추론 중...');
+        var genre = inferGenre(bpm, keyResult.key, keyResult.mode, buf);
+
+        ctx.close();
+        render({
+          filename: file.name,
+          bpm: bpm,
+          key: keyResult.key,
+          mode: keyResult.mode,
+          confidence: keyResult.confidence,
+          mainGenre: genre.mainGenre,
+          subGenre: genre.subGenre,
+          mainTags: genre.mainTags,
+          subTags: genre.subTags,
+          energy: genre.energy,
+          danceability: genre.danceability,
+          isAI: false
+        });
+      },
+      function(err){
+        ctx.close();
+        showError('오디오 디코딩 실패: ' + (err ? err.message||err : '') + '\n\nMP3 또는 WAV 파일을 사용해보세요.');
+      }
+    );
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── BPM 감지 ──
+function detectBPM(buf){
+  var sr   = buf.sampleRate;
+  var data = buf.getChannelData(0);
+  var fs   = Math.floor(sr * 0.01); // 10ms 프레임
+  var energies = [];
+
+  for (var i = 0; i < data.length - fs; i += fs){
+    var e = 0;
+    for (var j = 0; j < fs; j++) e += data[i+j]*data[i+j];
+    energies.push(e/fs);
+  }
+
+  var avg = 0;
+  for (var k=0;k<energies.length;k++) avg+=energies[k];
+  avg /= energies.length;
+
+  var thresh = avg * 1.5;
+  var peaks = [], lastP = -100;
+
+  for (var i=1; i<energies.length-1; i++){
+    if (energies[i]>thresh && energies[i]>energies[i-1] && energies[i]>energies[i+1]){
+      if (i-lastP > 20){ peaks.push(i); lastP=i; }
+    }
+  }
+
+  if (peaks.length < 4) return 120;
+
+  var intervals=[];
+  for (var i=1;i<peaks.length;i++) intervals.push((peaks[i]-peaks[i-1])*0.01);
+  intervals.sort(function(a,b){return a-b;});
+  var med = intervals[Math.floor(intervals.length/2)];
+  var bpm = Math.round(60/med);
+
+  while(bpm<60) bpm*=2;
+  while(bpm>200) bpm/=2;
+
+  var grid=[60,70,75,80,85,90,95,100,105,110,115,120,125,128,130,135,140,145,150,160,170,175,180];
+  var snap = grid.reduce(function(p,c){ return Math.abs(c-bpm)<Math.abs(p-bpm)?c:p; });
+  if (Math.abs(snap-bpm)<=5) bpm=snap;
+  return bpm;
+}
+
+// ── Key 감지 ──
+function detectKey(buf){
+  var data = buf.getChannelData(0);
+  var sr   = buf.sampleRate;
+  var chroma = new Array(12).fill(0);
+  var A4=440;
+  var freqs = [];
+  for(var n=0;n<12;n++) freqs.push(A4*Math.pow(2,(n-9)/12));
+
+  var fftSize=4096, count=0;
+  for(var offset=0; offset+fftSize<data.length; offset+=fftSize*4){
+    for(var n=0;n<12;n++){
+      var f=freqs[n], re=0, im=0;
+      var period=Math.floor(sr/f);
+      if(!period) continue;
+      var len=Math.min(period*4,fftSize);
+      for(var k=0;k<len;k++){
+        var s=data[offset+k]||0;
+        re+=s*Math.cos(2*Math.PI*k*f/sr);
+        im+=s*Math.sin(2*Math.PI*k*f/sr);
+      }
+      chroma[n]+=Math.sqrt(re*re+im*im);
+    }
+    if(++count>80) break;
+  }
+
+  var cmax=Math.max.apply(null,chroma);
+  for(var i=0;i<12;i++) chroma[i]=cmax>0?chroma[i]/cmax:0;
+
+  var maj=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  var min=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+  var notes=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  var bestKey=0, bestMode='Major', bestCorr=-Infinity;
+  for(var s=0;s<12;s++){
+    var cM=pearson(chroma,rotate(maj,s));
+    var cm=pearson(chroma,rotate(min,s));
+    if(cM>bestCorr){bestCorr=cM;bestKey=s;bestMode='Major';}
+    if(cm>bestCorr){bestCorr=cm;bestKey=s;bestMode='Minor';}
+  }
+
+  var conf=Math.round(Math.max(0,Math.min(1,(bestCorr+1)/2))*100);
+  return {key:notes[bestKey], mode:bestMode, confidence:conf};
+}
+
+function rotate(arr,n){ return arr.slice(n).concat(arr.slice(0,n)); }
+function pearson(a,b){
+  var n=a.length, ma=0, mb=0;
+  for(var i=0;i<n;i++){ma+=a[i];mb+=b[i];}
+  ma/=n; mb/=n;
+  var num=0,da=0,db=0;
+  for(var i=0;i<n;i++){num+=(a[i]-ma)*(b[i]-mb);da+=(a[i]-ma)*(a[i]-ma);db+=(b[i]-mb)*(b[i]-mb);}
+  return num/(Math.sqrt(da*db)||1);
+}
+
+// ── 장르 추론 ──
+function inferGenre(bpm, key, mode, buf){
+  var data=buf.getChannelData(0), sum=0;
+  var step=Math.floor(data.length/2000);
+  for(var i=0;i<data.length;i+=step) sum+=Math.abs(data[i]);
+  var energy=Math.min(1,(sum/2000)*5);
+  var dance=Math.max(0,Math.min(1,1-Math.abs(bpm-120)/80));
+
+  var mainGenre,subGenre,mt=[],st=[];
+
+  if(bpm<68){
+    mainGenre='발라드'; subGenre=mode==='Minor'?'슬로우 발라드':'팝 발라드';
+    mt=['Slow','Emotional','Melodic']; st=mode==='Minor'?['Minor','Sad','Atmospheric']:['Uplifting','Warm','Pop'];
+  } else if(bpm<90){
+    if(energy>0.5){mainGenre='R&B / Soul';subGenre=bpm<80?'Neo Soul':'Contemporary R&B';mt=['Groove','Soulful','Smooth'];st=['Urban','Rhythmic','Melodic'];}
+    else{mainGenre='재즈 / Jazz';subGenre=mode==='Minor'?'Smooth Jazz':'Jazz Ballad';mt=['Jazz','Improvisation','Swing'];st=['Sophisticated','Warm','Chord-rich'];}
+  } else if(bpm<112){
+    if(energy>0.55){mainGenre='팝 / Pop';subGenre=mode==='Minor'?'Dark Pop':'Indie Pop';mt=['Catchy','Melodic','Modern'];st=['Synth','Vocal-driven','Commercial'];}
+    else{mainGenre='포크 / Folk';subGenre=mode==='Minor'?'Folk Rock':'Acoustic Folk';mt=['Acoustic','Organic','Storytelling'];st=['Guitar','Intimate','Raw'];}
+  } else if(bpm<132){
+    if(energy>0.6){mainGenre='록 / Rock';subGenre=mode==='Minor'?'Alternative Rock':'Pop Rock';mt=['Guitar','Drums','Energetic'];st=mode==='Minor'?['Distortion','Gritty','Intense']:['Melodic','Upbeat','Driving'];}
+    else{mainGenre='팝 / Pop';subGenre='Synth Pop';mt=['Electronic','Catchy','Polished'];st=['Synthesizer','Dance-ready','Melodic'];}
+  } else if(bpm<155){
+    if(energy>0.6){mainGenre='댄스 / Dance';subGenre=bpm<142?'House':'Progressive House';mt=['Electronic','Club','4-on-floor'];st=['Build-up','Drop','Synth'];}
+    else{mainGenre='EDM';subGenre='Future Bass';mt=['Electronic','Bass','Melodic'];st=['Synth Lead','Atmospheric','Emotional'];}
+  } else {
+    if(energy>0.7){mainGenre='메탈 / Metal';subGenre=mode==='Minor'?'Heavy Metal':'Power Metal';mt=['Heavy','Guitar','Aggressive'];st=mode==='Minor'?['Dark','Distortion','Intense']:['Epic','Melodic','Powerful'];}
+    else{mainGenre='EDM / Techno';subGenre=bpm>172?'Drum & Bass':'Techno';mt=['Electronic','Driving','Hypnotic'];st=['Industrial','Repetitive','Club'];}
+  }
+
+  return {mainGenre:mainGenre, subGenre:subGenre, mainTags:mt, subTags:st, energy:energy, danceability:dance};
+}
+
+// ── 렌더 ──
+function render(d){
+  loading.style.display = 'none';
+  if(d.isAI) aiBadge.style.display = 'block';
+  resultWrap.style.display = 'block';
+
+  document.getElementById('resultFn').textContent = d.filename || '';
+  document.getElementById('rBpm').textContent     = d.bpm + (d.isAI?' *':'');
+  document.getElementById('rKey').textContent     = d.key;
+  document.getElementById('rMode').textContent    = d.mode + (d.isAI?' (추정)':'');
+  document.getElementById('rConf').textContent    = d.confidence + '%';
+  document.getElementById('rMain').textContent    = d.mainGenre;
+  document.getElementById('rSub').textContent     = d.subGenre;
+
+  document.getElementById('rMainTags').innerHTML = (d.mainTags||[]).map(function(t){return '<span class="tag">'+t+'</span>';}).join('');
+  document.getElementById('rSubTags').innerHTML  = (d.subTags||[]).map(function(t){return '<span class="tag">'+t+'</span>';}).join('');
+
+  document.getElementById('rEnergy').textContent = energyLbl(d.energy);
+  document.getElementById('rDance').textContent  = danceLbl(d.danceability);
+
+  setTimeout(function(){
+    document.getElementById('enBar').style.width = Math.round(d.energy*100)+'%';
+    document.getElementById('daBar').style.width = Math.round(d.danceability*100)+'%';
+  }, 80);
+}
+
+function energyLbl(e){
+  if(e>0.8)return '매우 강함 ⚡';
+  if(e>0.6)return '강함 🔥';
+  if(e>0.4)return '보통 🎵';
+  if(e>0.2)return '잔잔함 🌙';
+  return '매우 조용함 🕊️';
+}
+function danceLbl(d){
+  if(d>0.8)return '매우 높음 💃';
+  if(d>0.6)return '높음 🎶';
+  if(d>0.4)return '보통 🎵';
+  if(d>0.2)return '낮음 🎸';
+  return '매우 낮음 🎹';
+}
+
+// ── YouTube AI 분석 ──
+function analyzeYT(){
+  var url = ytInput.value.trim();
+  if(!url) return;
+  if(url.indexOf('youtube')<0 && url.indexOf('youtu.be')<0){
+    showError('유효한 YouTube URL을 입력해주세요.');
+    return;
+  }
+  startLoading();
+  setStep('AI 분석 중...');
+  ytBtn.disabled = true;
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:800,
+      system:'음악 전문가로서 YouTube URL에 해당하는 음악을 분석해 순수 JSON만 반환하세요. 마크다운 없이.\n형식: {"mainGenre":"주장르(한국어)","subGenre":"세부장르","bpm":숫자,"key":"C~B","mode":"Major또는Minor","confidence":0~100,"energy":0.0~1.0,"danceability":0.0~1.0,"mainTags":["","",""],"subTags":["",""]}',
+      messages:[{role:'user',content:'분석해주세요: '+url}]
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    var txt = data.content.map(function(c){return c.text||'';}).join('');
+    var clean = txt.replace(/```json|```/g,'').trim();
+    var p = JSON.parse(clean);
+    render({
+      filename:url, bpm:p.bpm, key:p.key, mode:p.mode, confidence:p.confidence,
+      mainGenre:p.mainGenre, subGenre:p.subGenre,
+      mainTags:p.mainTags, subTags:p.subTags,
+      energy:p.energy||0.5, danceability:p.danceability||0.5,
+      isAI:true
+    });
+  })
+  .catch(function(err){
+    showError('YouTube 분석 오류: '+err.message);
+  })
+  .finally(function(){
+    ytBtn.disabled=false;
+  });
+}
+</script>
+</body>
+</html>
